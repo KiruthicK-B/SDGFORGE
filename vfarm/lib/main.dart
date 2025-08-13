@@ -31,15 +31,10 @@ Future<void> main() async {
   }
 }
 class MyApp extends StatelessWidget {
-<<<<<<< HEAD
   final bool hasValidSession;
   
   const MyApp({super.key, this.hasValidSession = false});
 
-=======
-  const MyApp({super.key});
-  // This widget is the root of your application.
->>>>>>> e1f50e8c143a5e16896d5ec74e5974efa9418703
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
