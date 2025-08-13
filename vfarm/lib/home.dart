@@ -12,7 +12,7 @@ import 'package:vfarm/models/community_post_model.dart';
 import 'package:vfarm/models/notification_model.dart';
 import 'package:vfarm/session_manager.dart';
 import 'package:vfarm/Instant_services/training_page.dart';
-
+import 'package:flutter_tts/flutter_tts.dart';
 // ========== MAIN WRAPPER ==========
 class MainWrapper extends StatefulWidget {
   final Widget child;
@@ -1318,8 +1318,31 @@ Widget _buildImageCarousel() {
       ),
     );
   }
+
 Widget _buildQuickServicesGrid() {
-  const services = [
+  final FlutterTts flutterTts = FlutterTts();
+  bool isSpeaking = false;
+
+  Future<void> speakExplanation(FlutterTts tts, String text, String language) async {
+    try {
+      await tts.setLanguage(language);
+      await tts.setPitch(1.0);
+      await tts.setSpeechRate(0.5);
+      await tts.speak(text);
+    } catch (e) {
+      print('Error in TTS: $e');
+      // Show error message to user
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Voice service unavailable')),
+      );
+    }
+  }
+
+  Future<void> stopSpeaking() async {
+    await flutterTts.stop();
+  }
+  
+  var services = [
     ServiceData(
       icon: Icons.account_balance_wallet,
       title: 'Government Schemes',
@@ -1348,7 +1371,114 @@ Widget _buildQuickServicesGrid() {
       route: '/myVault',
       badge: '',
     ),
+     ServiceData(
+      icon: Icons.record_voice_over,
+      title: 'Voice Translator',
+      color: Color(0xFFE91E63),
+      route: '/voiceTranslator',
+      badge: 'NEW',
+    ),
   ];
+
+  // Voice explanations for each service
+  final Map<String, Map<String, String>> serviceExplanations = {
+    'Government Schemes': {
+      'english': 'Access various government welfare programs and schemes available for citizens',
+      'tamil': 'குடிமக்களுக்கு கிடைக்கும் பல்வேறு அரசு நலத்திட்டங்களை அணுகவும்'
+    },
+    'Book a Service': {
+      'english': 'Schedule and book professional services for your home and business needs',
+      'tamil': 'உங்கள் வீடு மற்றும் வணிக தேவைகளுக்காக தொழில்முறை சேவைகளை பதிவு செய்யுங்கள்'
+    },
+    'Ask Expert': {
+      'english': 'Get professional advice and consultation from industry experts',
+      'tamil': 'தொழில் நிபுணர்களிடமிருந்து தொழில்முறை ஆலோசனை மற்றும் கலந்தாலோசனை பெறுங்கள்'
+    },
+    'My Vault': {
+      'english': 'Securely store and manage your important documents and files',
+      'tamil': 'உங்கள் முக்கியமான ஆவணங்கள் மற்றும் கோப்புகளை பாதுகாப்பாக சேமித்து நிர்வகிக்கவும்'
+    },
+    'Voice Translator': {
+      'english': 'Translate and hear explanations of services in your preferred language',
+      'tamil': 'உங்கள் விருப்பமான மொழியில் சேவைகளின் விளக்கங்களை மொழிபெயர்த்து கேளுங்கள்'
+    },
+  };
+
+  Future<void> _showLanguageSelection(BuildContext context, String serviceName) async {
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Row(
+                children: [
+                  Icon(Icons.volume_up, color: Colors.blue, size: 20),
+                  SizedBox(width: 8),
+                  Expanded(child: Text('Choose Language / மொழி தேர்வு', style: TextStyle(fontSize: 16))),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.language, color: Colors.blue),
+                    title: const Text('English'),
+                    trailing: isSpeaking ? 
+                      IconButton(
+                        icon: Icon(Icons.stop, color: Colors.red),
+                        onPressed: () async {
+                          await stopSpeaking();
+                          setState(() => isSpeaking = false);
+                        },
+                      ) : null,
+                    onTap: () async {
+                      setState(() => isSpeaking = true);
+                      await speakExplanation(flutterTts, serviceExplanations[serviceName]!['english']!, 'en-US');
+                      setState(() => isSpeaking = false);
+                    },
+                  ),
+                  Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.language, color: Colors.orange),
+                    title: const Text('தமிழ் (Tamil)'),
+                    trailing: isSpeaking ? 
+                      IconButton(
+                        icon: Icon(Icons.stop, color: Colors.red),
+                        onPressed: () async {
+                          await stopSpeaking();
+                          setState(() => isSpeaking = false);
+                        },
+                      ) : null,
+                    onTap: () async {
+                      setState(() => isSpeaking = true);
+                      await speakExplanation(flutterTts, serviceExplanations[serviceName]!['tamil']!, 'ta-IN');
+                      setState(() => isSpeaking = false);
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    if (isSpeaking) stopSpeaking();
+                    Navigator.of(context).pop();
+                  },
+                  child: Text('Close'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Navigate to service page
+  void _navigateToService(ServiceData service) {
+    Navigator.pushNamed(context, service.route);
+  }
 
   return Stack(
     children: [
@@ -1447,10 +1577,10 @@ Widget _buildQuickServicesGrid() {
                       ),
                     ],
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.dashboard_customize_rounded,
                     size: 22,
-                    color: const Color(0xFF0A9D88),
+                    color: Color(0xFF0A9D88),
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -1539,14 +1669,15 @@ Widget _buildQuickServicesGrid() {
                 physics: const NeverScrollableScrollPhysics(),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
-                  childAspectRatio: 1.0, // Much more height for content
+                  childAspectRatio: 1.0,
                   crossAxisSpacing: 16,
                   mainAxisSpacing: 16,
                 ),
                 itemCount: services.length,
                 itemBuilder: (context, index) => ServiceCard(
                   data: services[index],
-                  onTap: () => Navigator.pushNamed(context, services[index].route),
+                  onTap: () => _navigateToService(services[index]),
+                  onVoiceIconTap: () => _showLanguageSelection(context, services[index].title),
                 ),
               ),
             ),
@@ -2564,7 +2695,7 @@ class ServiceData {
   final String route;
   final String badge;
 
-  const ServiceData({
+  ServiceData({
     required this.icon,
     required this.title,
     required this.color,
@@ -2764,8 +2895,14 @@ class StatsItem extends StatelessWidget {
 class ServiceCard extends StatelessWidget {
   final ServiceData data;
   final VoidCallback onTap;
+  final VoidCallback onVoiceIconTap;
 
-  const ServiceCard({super.key, required this.data, required this.onTap});
+  const ServiceCard({
+    super.key, 
+    required this.data, 
+    required this.onTap,
+    required this.onVoiceIconTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -2887,39 +3024,75 @@ class ServiceCard extends StatelessWidget {
                 ),
               ),
               // Enhanced badge
-              Positioned(
-                top: 8,
-                right: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        data.color,
-                        data.color.withOpacity(0.8),
-                      ],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
+              if (data.badge.isNotEmpty)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 3,
                     ),
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: data.color.withOpacity(0.3),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          data.color,
+                          data.color.withOpacity(0.8),
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
                       ),
-                    ],
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: data.color.withOpacity(0.3),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      data.badge,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 8,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
                   ),
-                  child: Text(
-                    data.badge,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 8,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.2,
+                ),
+              // Voice icon at bottom right corner
+              Positioned(
+                bottom: 8,
+                right: 8,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: onVoiceIconTap,
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                        border: Border.all(
+                          color: Colors.grey.shade300,
+                          width: 0.5,
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.volume_up_rounded,
+                        size: 16,
+                        color: Colors.grey.shade600,
+                      ),
                     ),
                   ),
                 ),
@@ -2949,8 +3122,7 @@ class ServiceCard extends StatelessWidget {
       ),
     );
   }
-}
-class TrendingCard extends StatelessWidget {
+}class TrendingCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final Color color;
