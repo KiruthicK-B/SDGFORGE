@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:vfarm/home.dart';
 import 'package:vfarm/models/govt_scheme_model.dart';
 import 'package:vfarm/models/user_profile_model.dart';
+import 'package:vfarm/scheme_detail_screen.dart';
 import 'package:vfarm/scheme_service.dart';
 import 'package:vfarm/screens/scheme_application_screen.dart';
 import 'package:vfarm/session_manager.dart';
 import 'package:vfarm/status/application_status_sheet.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 class EnhancedGovtSchemesScreen extends StatefulWidget {
   const EnhancedGovtSchemesScreen({super.key});
 
@@ -1622,259 +1624,338 @@ Widget _buildSideNavigation() {
   }
 }
 
-// Create a simple SchemeDetailScreen to handle the navigation
-class SchemeDetailScreen extends StatelessWidget {
+class SchemeDescriptionWithVoice extends StatefulWidget {
   final GovtSchemeModel scheme;
-  final bool isEligible;
-  final UserProfileModel? userProfile;
-  final VoidCallback? onApplicationSubmitted;
-
-  const SchemeDetailScreen({
+  
+  const SchemeDescriptionWithVoice({
     super.key,
     required this.scheme,
-    required this.isEligible,
-    this.userProfile,
-    this.onApplicationSubmitted,
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        title: Text(
-          scheme.name,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
+  State<SchemeDescriptionWithVoice> createState() => _SchemeDescriptionWithVoiceState();
+}
+
+class _SchemeDescriptionWithVoiceState extends State<SchemeDescriptionWithVoice> {
+  FlutterTts? flutterTts;
+  
+  bool isPlaying = false;
+  bool isLoading = false;
+  String selectedLanguage = 'en-US';
+  bool _isDisposed = false;
+  
+  // Language options with TTS language codes
+  final Map<String, String> languages = {
+    'en-US': 'English',
+    'hi-IN': 'हिंदी (Hindi)',
+    'te-IN': 'తెలుగు (Telugu)',
+    'ta-IN': 'தமிழ் (Tamil)',
+    'kn-IN': 'ಕನ್ನಡ (Kannada)',
+    'ml-IN': 'മലയാളം (Malayalam)',
+    'bn-IN': 'বাংলা (Bengali)',
+    'gu-IN': 'ગુજરાતી (Gujarati)',
+    'mr-IN': 'मराठी (Marathi)',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeServices();
+  }
+
+  void _initializeServices() async {
+    try {
+      flutterTts = FlutterTts();
+      
+      if (flutterTts != null && !_isDisposed) {
+        await _initializeTts();
+      }
+    } catch (e) {
+      debugPrint('Error initializing services: $e');
+    }
+  }
+
+  Future<void> _initializeTts() async {
+    if (flutterTts == null || _isDisposed) return;
+    
+    try {
+      await flutterTts!.setLanguage(selectedLanguage);
+      await flutterTts!.setSpeechRate(0.5);
+      await flutterTts!.setVolume(1.0);
+      await flutterTts!.setPitch(1.0);
+      
+      flutterTts!.setCompletionHandler(() {
+        if (!_isDisposed && mounted) {
+          setState(() {
+            isPlaying = false;
+          });
+        }
+      });
+      
+      flutterTts!.setErrorHandler((msg) {
+        if (!_isDisposed && mounted) {
+          setState(() {
+            isPlaying = false;
+            isLoading = false;
+          });
+          _showError('Speech Error: $msg');
+        }
+      });
+    } catch (e) {
+      debugPrint('Error initializing TTS: $e');
+    }
+  }
+
+  Future<void> _toggleSpeech() async {
+    if (_isDisposed || !mounted) return;
+    
+    if (isPlaying) {
+      await _stopSpeaking();
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      if (flutterTts != null && !_isDisposed && mounted) {
+        // Set language and speak
+        await flutterTts!.setLanguage(selectedLanguage);
+        
+        if (mounted) {
+          setState(() {
+            isPlaying = true;
+            isLoading = false;
+          });
+        }
+        
+        // Speak the description
+        await flutterTts!.speak(widget.scheme.description);
+      }
+    } catch (e) {
+      if (!_isDisposed && mounted) {
+        setState(() {
+          isLoading = false;
+          isPlaying = false;
+        });
+        _showError('Speech failed: ${e.toString()}');
+      }
+    }
+  }
+
+  Future<void> _stopSpeaking() async {
+    if (flutterTts != null && !_isDisposed) {
+      await flutterTts!.stop();
+      if (mounted) {
+        setState(() {
+          isPlaying = false;
+        });
+      }
+    }
+  }
+
+  void _showError(String message) {
+    if (mounted && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 2),
         ),
-        backgroundColor: const Color(0xFF0A9D88),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    if (flutterTts != null) {
+      flutterTts!.stop();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.scheme.description.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Description Header with Language Selector
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Hero Image
-            Container(
-              height: 200,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF0A9D88), Color(0xFF0C7B68)],
-                ),
+            Text(
+              'Description',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade800,
               ),
-              child: scheme.imagePath.isNotEmpty
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: Image.asset(
-                        scheme.imagePath,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Center(
-                            child: Icon(
-                              Icons.agriculture_rounded,
-                              size: 80,
-                              color: Colors.white,
-                            ),
-                          );
-                        },
-                      ),
-                    )
-                  : const Center(
-                      child: Icon(
-                        Icons.agriculture_rounded,
-                        size: 80,
-                        color: Colors.white,
-                      ),
-                    ),
             ),
-            const SizedBox(height: 24),
-            
-            // Scheme Details
-            Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(8),
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Title and Status
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            scheme.name,
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF2C3E50),
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isEligible ? Colors.green : Colors.orange,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            isEligible ? 'Eligible' : 'Check Criteria',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
+              child: DropdownButton<String>(
+                value: selectedLanguage,
+                underline: const SizedBox(),
+                icon: const Icon(Icons.language, size: 16),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade700,
+                ),
+                items: languages.entries.map((entry) {
+                  return DropdownMenuItem(
+                    value: entry.key,
+                    child: Text(
+                      entry.value,
+                      style: const TextStyle(fontSize: 12),
                     ),
-                    const SizedBox(height: 16),
-                    
-                    // Description
-                    Text(
-                      'Description',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade800,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      scheme.description,
+                  );
+                }).toList(),
+                onChanged: (String? newValue) {
+                  if (newValue != null && !_isDisposed) {
+                    setState(() {
+                      selectedLanguage = newValue;
+                      if (isPlaying) {
+                        _stopSpeaking();
+                      }
+                    });
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        
+        // Description Container with Voice Controls
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0A9D88).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Voice Control Row
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.scheme.description,
                       style: TextStyle(
                         fontSize: 16,
                         color: Colors.grey.shade700,
                         height: 1.5,
                       ),
                     ),
-                    const SizedBox(height: 24),
-                    
-                    // Benefits
-                    Text(
-                      'Benefits',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade800,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0A9D88).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        scheme.benefits['description']?.toString() ?? 
-                        'Financial assistance and comprehensive support',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey.shade700,
-                          height: 1.5,
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    children: [
+                      // Play/Pause Button
+                      Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0A9D88),
+                          borderRadius: BorderRadius.circular(25),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF0A9D88).withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    
-                    // Eligible Crops
-                    if (scheme.eligibleCropTypes.isNotEmpty) ...[
-                      Text(
-                        'Eligible Crops',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey.shade800,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: scheme.eligibleCropTypes.map((crop) {
-                          return Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: Colors.blue.withOpacity(0.3),
-                              ),
-                            ),
-                            child: Text(
-                              crop.toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.blue,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 24),
-                    ],
-                    
-                    // Apply Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: isEligible && userProfile != null
-                            ? () {
-                                // Navigate to SchemeApplicationScreen
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => SchemeApplicationScreen(
-                                      scheme: scheme,
-                                      userProfile: userProfile!,
-                                      onApplicationSubmitted: () {
-                                        Navigator.pop(context); // Go back to previous screen
-                                        if (onApplicationSubmitted != null) {
-                                          onApplicationSubmitted!();
-                                        }
-                                      },
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(25),
+                            onTap: (isLoading || _isDisposed) ? null : _toggleSpeech,
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              child: isLoading
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.white,
+                                        ),
+                                      ),
+                                    )
+                                  : Icon(
+                                      isPlaying ? Icons.stop : Icons.volume_up,
+                                      color: Colors.white,
+                                      size: 20,
                                     ),
-                                  ),
-                                );
-                              }
-                            : null,
-                        icon: const Icon(Icons.send_rounded),
-                        label: const Text('Apply for this Scheme'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0A9D88),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
-                          elevation: 4,
                         ),
                       ),
-                    ),
-                  ],
-                ),
+                      const SizedBox(height: 4),
+                      Text(
+                        isPlaying ? 'Stop' : 'Listen',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ),
-          ],
+              
+              // Language indicator
+              if (selectedLanguage != 'en-US') ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0A9D88).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: const Color(0xFF0A9D88).withOpacity(0.3),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.record_voice_over,
+                        size: 12,
+                        color: Color(0xFF0A9D88),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Voice: ${languages[selectedLanguage] ?? selectedLanguage}',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Color(0xFF0A9D88),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }
