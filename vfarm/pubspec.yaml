@@ -1,0 +1,75 @@
+name: vfarm
+description: "A new Flutter project."
+
+publish_to: 'none' 
+
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.7.2
+
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+ 
+  cupertino_icons: ^1.0.8
+  font_awesome_flutter: ^10.8.0
+  local_auth: ^2.3.0
+  firebase_core: ^3.15.1
+  cloud_firestore: ^5.6.11
+  flutter_spinkit: ^5.2.1
+  shared_preferences: ^2.5.3
+  firebase_auth: ^5.6.2
+  intl: 0.20.2
+  shimmer: ^3.0.0
+  cached_network_image: ^3.4.1
+  firebase_storage: ^12.4.9
+  file_picker: ^10.2.0
+  image_picker: ^1.1.2
+  url_launcher: ^6.3.2
+  dio: ^5.8.0+1
+  permission_handler: ^12.0.1
+  path_provider: ^2.1.5
+  pdf: ^3.11.3
+  printing: ^5.14.2
+  open_file: ^3.5.10
+  docx_template: ^0.4.0
+  device_info_plus: ^11.5.0
+  video_player: ^2.10.0
+  timeago: ^3.7.1
+  flutter_sound: ^9.28.0
+  youtube_player_flutter: ^9.1.1
+  fl_chart: ^1.0.0
+  google_maps_flutter: ^2.12.3
+  geolocator: ^14.0.2
+  http: ^1.5.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.3
+
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/finallogo.png"
+flutter_launcher_name:
+  name: "VFarm"
+
+flutter:
+  assets:
+    - assets/finallogo.png
+    - assets/logo.png
+    - assets/vfarm-logo.png
+    - assets/schemes/PMFBY.webp
+    - assets/schemes/pmksy.webp
+    - assets/schemes/RKVY.png
+    - assets/schemes/pm-kisan-scheme.webp
+    - assets/forms/vfarmform.docx
+  uses-material-design: true 
