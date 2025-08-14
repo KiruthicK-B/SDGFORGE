@@ -28,8 +28,7 @@ class _MyVaultScreenState extends State<MyVaultScreen> with TickerProviderStateM
   bool _isLoading = true;
   late AnimationController _waveController;
   late Animation<double> _waveAnimation;
-  
-  // Use SessionManager instead of separate auth variables
+ 
   final SessionManager _sessionManager = SessionManager.instance;
 
   final List<String> _categories = [
